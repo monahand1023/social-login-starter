@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Optional Level-2 backend for social-login-starter: validates a Cognito ID
+  token and issues an httpOnly session cookie. Deploy with:
+  sam build && sam deploy --guided
+
+Parameters:
+  UserPoolId:
+    Type: String
+  ClientId:
+    Type: String
+
+Resources:
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sessionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sessionId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  SessionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../session-lambda/
+      Handler: index.handler
+      Runtime: nodejs20.x
+      Timeout: 10
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPoolId
+          CLIENT_ID: !Ref ClientId
+          SESSIONS_TABLE: !Ref SessionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - '*'
+          AllowMethods:
+            - POST
+          AllowCredentials: false
+
+Outputs:
+  SessionApiUrl:
+    Description: POST your idToken here to receive an httpOnly session cookie
+    Value: !GetAtt SessionFunctionUrl.FunctionUrl

@@ -1,0 +1,11 @@
+{
+  "name": "social-login-session-lambda",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "aws-jwt-verify": "^4.0.1",
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0"
+  }
+}
