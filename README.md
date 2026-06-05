@@ -5,6 +5,9 @@ Add **Sign in with Google** and **Sign in with Apple** to any website — no pas
 [![CI](https://github.com/monahand1023/social-login-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/monahand1023/social-login-starter/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+> [!NOTE]
+> **Status: proof-of-concept / starting point — a base to build on, not a turnkey production service.** The code is unit-tested and the CloudFormation lints clean, but it has **not** been run end-to-end against live Google / Apple / AWS. Validate it in your own account before relying on it, and see [What this does — and what it doesn't](#what-this-does--and-what-it-doesnt) for the explicit non-goals.
+
 ---
 
 ## What this is (60-second read)
