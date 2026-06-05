@@ -14,17 +14,19 @@ After a successful Level 1 sign-in, `callback.html` has the Cognito `id_token` i
 
 1. **Validates the token** against Cognito's JWKS endpoint using `aws-jwt-verify` (the token's signature, issuer, audience, and expiry are all checked cryptographically — no secrets on your side).
 2. **Creates a server-side session record** in DynamoDB keyed by a random UUID.
-3. **Returns an `httpOnly` cookie** (`Set-Cookie: session=<uuid>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`).
+3. **Returns an `httpOnly` cookie** (`Set-Cookie: session=<uuid>; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`).
 
-The browser stores the cookie automatically. Because the cookie is `HttpOnly`, **JavaScript cannot read it** — even if an XSS vulnerability exists in your page, an attacker cannot steal the session identifier. Later API calls include the cookie automatically, so the backend knows who the user is without the frontend ever touching the token again.
+The browser stores the cookie automatically. Because the cookie is `HttpOnly`, **JavaScript cannot read it** — even if an XSS vulnerability exists in your page, an attacker cannot steal the session identifier. Later requests include the cookie automatically, so the backend knows who the user is without the frontend ever touching the token again.
+
+The Lambda is routed by HTTP method: **`POST`** creates the session (above), **`GET`** reads the cookie and returns `{ sub, email }` (used by `socialLogin.loadUser()`), and **`DELETE`** clears the cookie and deletes the session row (used by `socialLogin.signOut()`).
 
 ### The trade-off
 
 This is a real backend. You are now responsible for:
 
 - Deploying and maintaining a Lambda + DynamoDB table.
-- Managing CORS headers if your frontend and API are on different origins.
-- Deciding how to handle session expiry, refresh, and logout (clearing the cookie and the DynamoDB record).
+- Managing CORS and **cross-origin cookies** when your frontend and API are on different origins (see the warning in the Deploy section, and the "Cross-origin cookies" section of [`docs/07-level-2-backend.md`](../docs/07-level-2-backend.md)).
+- Session expiry and refresh (this starter sets a 7-day TTL and does not refresh; logout is handled for you via the `DELETE` route).
 - Paying for Lambda invocations and DynamoDB reads/writes (costs are very low at small scale, but non-zero).
 
 If your site is static and you are not building an API that needs to authenticate requests server-side, **stick with Level 1**.
@@ -52,37 +54,38 @@ cd backend-optional/infra
 # Build (installs aws-jwt-verify + AWS SDK into the Lambda package):
 sam build
 
-# Deploy (interactive first time — SAM will ask for a stack name and region):
+# Deploy (interactive first time — SAM will ask for a stack name and region).
+# AllowedOrigin MUST be the exact origin you serve your site from
+# (scheme + host + port, no trailing slash):
 sam deploy --guided \
   --parameter-overrides \
     UserPoolId=<your-user-pool-id> \
-    ClientId=<your-client-id>
+    ClientId=<your-client-id> \
+    AllowedOrigin=http://localhost:8000
 ```
 
-SAM will print the `SessionApiUrl` output (a Lambda Function URL). Copy it — you'll POST to it from your frontend.
+SAM will print the `SessionApiUrl` output (a Lambda Function URL). Copy it — you'll paste it into `config.js` next.
+
+> **⚠️ Cross-origin cookies.** `AllowedOrigin` must exactly match your site's origin, because the session cookie is credentialed: the browser only sends/receives it for that one origin, and CORS with credentials forbids the `*` wildcard. The cookie is `SameSite=None; Secure`, which also means **HTTPS only** (`localhost` is exempt, so the demo works locally). Note that some browsers block third-party cookies entirely — for production, host the session API on the **same site** as your pages (e.g. `api.yoursite.com` ↔ `yoursite.com`). Full explanation: ["Cross-origin cookies" in docs/07](../docs/07-level-2-backend.md).
 
 ---
 
-## Call it from the frontend
+## Connect it to the frontend
 
-After a successful `handleCallback()`, you have the raw tokens in `sessionStorage` under the key `sl_tokens`. Here is the minimal wiring (add this to your `callback.html` after `window.location.replace('index.html')` returns, or factor it into your own session layer):
+You do **not** need to write any `fetch` code — the frontend is already wired. Just point `config.js` at your deployed API:
 
 ```js
-const stored = JSON.parse(sessionStorage.getItem('sl_tokens') || 'null');
-if (stored) {
-  await fetch('https://<your-session-api-url>/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',          // tells the browser to send/receive cookies
-    body: JSON.stringify({ idToken: stored.id_token }),
-  });
-  // The browser now holds an httpOnly session cookie.
-  // You can optionally clear the tokens from sessionStorage at this point.
-  sessionStorage.removeItem('sl_tokens');
-}
+// in config.js
+sessionApiUrl: 'https://<your-session-api-url>/',   // the SessionApiUrl output above
 ```
 
-> **Note:** `credentials: 'include'` is required for the browser to store the cookie cross-origin. Your Lambda's CORS configuration (in `session-api.yaml`) must set `AllowCredentials: true` and a specific `AllowOrigins` entry (not `*`) when using credentials. The template ships with `AllowCredentials: false` and `AllowOrigins: ['*']` as a safe default for same-origin or testing; update both for production cross-origin use.
+With that set, `js/auth.js` automatically:
+
+- **POSTs** the ID token on the callback to create the session (and keeps **no** token in `sessionStorage`),
+- **GETs** the session in `socialLogin.loadUser()` to render the signed-in state,
+- **DELETEs** the session in `socialLogin.signOut()`.
+
+Leave `sessionApiUrl` empty to stay on the browser-only Level-1 demo. See [`docs/07-level-2-backend.md`](../docs/07-level-2-backend.md) for the full walkthrough.
 
 ---
 
@@ -92,8 +95,8 @@ if (stored) {
 backend-optional/
 ├── README.md                  ← you are here
 ├── session-lambda/
-│   ├── index.js               ← Lambda handler (validate token, write DynamoDB, set cookie)
-│   ├── cookie.js              ← pure Set-Cookie builder (unit-tested)
+│   ├── index.js               ← Lambda handler, routed by method: POST/GET/DELETE
+│   ├── cookie.js              ← pure cookie helpers: build / clear / parse (unit-tested)
 │   └── package.json           ← aws-jwt-verify + AWS SDK v3 dependencies
 ├── test/
 │   └── cookie.test.js         ← node:test unit tests for cookie.js
@@ -109,4 +112,4 @@ backend-optional/
 node --test backend-optional/test/cookie.test.js
 ```
 
-Expected: 2 tests pass. The cookie helper is the only unit-testable piece — the Lambda handler (`index.js`) calls live AWS services and is integration-tested by deploying and POSTing a real token.
+Expected: 5 tests pass. The cookie helpers are the only unit-testable pieces — the Lambda handler (`index.js`) calls live AWS services and is integration-tested by deploying and POSTing a real token.

@@ -17,4 +17,11 @@ window.AUTH_CONFIG = {
   redirectUri: window.location.origin + '/callback.html',
   logoutUri:   window.location.origin + '/',
   scope:       'email openid profile',
+
+  // ── OPTIONAL: "Level 2" server-side sessions (httpOnly cookie) ───────────
+  //  Leave this EMPTY for the default browser-only demo (no backend needed).
+  //  To switch the demo to secure, server-side sessions, deploy the
+  //  backend-optional/ stack and paste its SessionApiUrl here.
+  //  See docs/07-level-2-backend.md.
+  sessionApiUrl: '',
 };

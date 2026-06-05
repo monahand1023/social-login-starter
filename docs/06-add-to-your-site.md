@@ -76,30 +76,27 @@ The callback URL you registered must match exactly. For example, if your site is
 After the scripts are loaded, you have access to these functions anywhere in your JavaScript:
 
 ```js
-// Is the user currently signed in?
-if (window.socialLogin.isLoggedIn()) {
-  // Yes
-}
-
-// Get the current user's info (returns null if not signed in)
-const user = window.socialLogin.getUser();
+// Get the current user — returns a Promise of the user object, or null.
+// Use loadUser(): it works whether or not you later add the Level-2 backend.
+const user = await window.socialLogin.loadUser();
 if (user) {
   console.log(user.email);   // e.g., alice@example.com
   console.log(user.name);    // display name (falls back to email if unavailable)
   console.log(user.sub);     // unique user ID from Cognito
-  // user.claims has the full set of JWT claims
 }
 
-// Sign out (clears session and redirects to Cognito logout)
-window.socialLogin.signOut();
+// Sign out (clears the session and redirects to Cognito logout)
+await window.socialLogin.signOut();
 ```
 
-A typical pattern is to check `isLoggedIn()` on page load and show different UI depending on the result:
+> The synchronous `window.socialLogin.isLoggedIn()` and `getUser()` also exist and are handy in Level-1 (browser-only) mode. But prefer the async `loadUser()` for new code: if you ever set `sessionApiUrl` to enable the Level-2 backend, `loadUser()` keeps working unchanged (it reads the server session) while the sync helpers only see browser-held tokens.
+
+A typical pattern is to call `loadUser()` on page load and show different UI depending on the result:
 
 ```js
-document.addEventListener('DOMContentLoaded', function () {
-  if (window.socialLogin.isLoggedIn()) {
-    const user = window.socialLogin.getUser();
+document.addEventListener('DOMContentLoaded', async function () {
+  const user = await window.socialLogin.loadUser();
+  if (user) {
     document.getElementById('welcome').textContent = 'Hello, ' + user.name;
     document.getElementById('signed-out-section').hidden = true;
     document.getElementById('signed-in-section').hidden = false;
@@ -116,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 The tokens returned by Cognito are stored in `sessionStorage` — they live in memory for the current browser tab. Closing the tab clears the session. This is the simplest and safest approach for a static site because no token ever touches a server or a cookie.
 
-If you need sessions that survive tab closes, work across tabs, or be validated on a server, see [07-level-2-backend.md](07-level-2-backend.md) for the optional httpOnly cookie backend.
+If you need sessions that survive tab closes, work across tabs, or be validated on a server, see [07-level-2-backend.md](07-level-2-backend.md) for the optional httpOnly cookie backend. The frontend is already wired for it — you enable it by setting `sessionApiUrl` in `config.js`, with no code changes here (your `loadUser()` calls keep working).
 
 ---
 

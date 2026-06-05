@@ -45,11 +45,13 @@
           '</ul>';
       }
 
-      function render() {
+      // loadUser() is async and works whether or not the Level-2 backend is
+      // configured (browser-only tokens, or a server session cookie).
+      async function render() {
         var inEl = document.getElementById('logged-in');
         var outEl = document.getElementById('logged-out');
-        if (window.socialLogin.isLoggedIn()) {
-          var user = window.socialLogin.getUser();
+        var user = await window.socialLogin.loadUser();
+        if (user) {
           document.getElementById('user-email').textContent = user.email || user.name;
           inEl.hidden = false;
           outEl.hidden = true;

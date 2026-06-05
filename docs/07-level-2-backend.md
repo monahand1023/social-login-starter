@@ -22,37 +22,31 @@ If you are building a backend API that needs to authenticate requests (e.g. "onl
 
 ### Conceptual flow
 
+The session API has three operations, and the frontend already calls all three when `sessionApiUrl` is set (see "Turn it on" below):
+
 ```
-Browser                          Lambda                        DynamoDB
-  │                                │                               │
-  │  POST /session                 │                               │
-  │  { idToken: "eyJ..." }         │                               │
-  │ ─────────────────────────────► │                               │
-  │                                │  verify(idToken)              │
-  │                                │  (checks signature vs JWKS,   │
-  │                                │   issuer, audience, expiry)   │
-  │                                │                               │
-  │                                │  PutItem sessionId=<uuid>     │
-  │                                │  sub, email, expiresAt ──────►│
-  │                                │                               │
-  │  HTTP 200                      │                               │
-  │  Set-Cookie: session=<uuid>;   │                               │
-  │    HttpOnly; Secure;           │                               │
-  │    SameSite=Lax; Path=/;       │                               │
-  │    Max-Age=604800              │                               │
-  │ ◄───────────────────────────── │                               │
-  │                                │                               │
-  │  (browser stores cookie        │                               │
-  │   automatically; JS cannot     │                               │
-  │   read it — HttpOnly)          │                               │
-  │                                │                               │
-  │  GET /api/orders               │                               │
-  │  Cookie: session=<uuid>  ─────►│  GetItem sessionId=<uuid> ──►│
-  │                                │  ◄── {sub, email, expiresAt} │
-  │  [ orders for this user ] ◄─── │                               │
+                              Session Lambda                  DynamoDB
+callback.html                       │                            │
+  │  POST { idToken: "eyJ..." }     │                            │
+  │ ──────────────────────────────► │ verify(idToken) vs JWKS    │
+  │                                 │ PutItem sessionId=<uuid> ──►│
+  │  200  Set-Cookie: session=<uuid>;                            │
+  │       HttpOnly; Secure; SameSite=None; Path=/; Max-Age=…     │
+  │ ◄────────────────────────────── │                            │
+  │  (browser stores the cookie; JS cannot read it — HttpOnly)   │
+
+index.html  →  socialLogin.loadUser()
+  │  GET   (Cookie: session=<uuid>) │ GetItem sessionId=<uuid> ──►│
+  │ ──────────────────────────────► │ ◄── { sub, email }         │
+  │  200  { sub, email }  ◄──────────│                           │
+
+Sign out  →  socialLogin.signOut()
+  │  DELETE (Cookie: session=<uuid>)│ DeleteItem sessionId=<uuid>►│
+  │ ──────────────────────────────► │                            │
+  │  200  Set-Cookie: session=; Max-Age=0  (cookie cleared)      │
 ```
 
-The key security property: because the cookie is `HttpOnly`, JavaScript on your page cannot read its value. An XSS attacker who can execute scripts in your page cannot steal the session identifier. The Cognito ID token never travels over the network after the initial exchange — it stays in `sessionStorage` only long enough to be sent once to the session endpoint.
+The key security property: because the cookie is `HttpOnly`, JavaScript on your page cannot read its value. An XSS attacker who can execute scripts in your page cannot steal the session identifier. In Level-2 mode the Cognito ID token is **never written to `sessionStorage`** — it is sent once from memory to the session endpoint and then discarded; the httpOnly cookie becomes the source of truth.
 
 ---
 
@@ -62,21 +56,41 @@ The implementation lives in [`backend-optional/`](../backend-optional/README.md)
 
 | File | Purpose |
 |---|---|
-| `session-lambda/cookie.js` | Pure function that builds the `Set-Cookie` header string. Unit-tested. |
-| `session-lambda/index.js` | Lambda handler: parse body → verify token → write DynamoDB → return cookie. |
+| `session-lambda/cookie.js` | Pure helpers: build the `Set-Cookie` string, build a clear-cookie, parse the session id from a request. Unit-tested. |
+| `session-lambda/index.js` | Lambda handler, routed by method: `POST` (create) / `GET` (check) / `DELETE` (logout). |
 | `session-lambda/package.json` | `aws-jwt-verify` (token validation) + AWS SDK v3 (DynamoDB). |
-| `infra/session-api.yaml` | AWS SAM template: Lambda Function URL + DynamoDB table with TTL. |
-| `test/cookie.test.js` | `node:test` unit tests for the cookie builder. |
+| `infra/session-api.yaml` | AWS SAM template: Lambda Function URL (credentialed CORS) + DynamoDB table with TTL. |
+| `test/cookie.test.js` | `node:test` unit tests for the cookie helpers. |
 
-For full deploy instructions, prerequisites, and the frontend wiring snippet, read **[`backend-optional/README.md`](../backend-optional/README.md)**.
+For full deploy instructions and prerequisites, read **[`backend-optional/README.md`](../backend-optional/README.md)**.
 
 ---
 
-## Wiring the frontend is left as an exercise
+## Turn it on (the frontend is already wired)
 
-The demo (`index.html`, `callback.html`) stays Level 1 by default. It will not call the session endpoint unless you add the `fetch` call yourself. This is intentional: the frontend is already correct and complete without a backend, and wiring it to a specific API URL would break the "clone and serve" simplicity of the demo.
+Unlike a typical starter, you do **not** need to write any `fetch` code — `js/auth.js` already calls the session API when, and only when, `sessionApiUrl` is set. To switch the demo from Level 1 to Level 2:
 
-When you are ready to connect them, the `backend-optional/README.md` has the exact `fetch` snippet to add to `callback.html` after `handleCallback()` resolves.
+1. Deploy the backend (see [`backend-optional/README.md`](../backend-optional/README.md)). When deploying, set **`AllowedOrigin`** to the exact origin you serve the demo from — e.g. `http://localhost:8000` — so the browser will accept the cookie.
+2. Copy the printed **`SessionApiUrl`** into your `config.js`:
+   ```js
+   sessionApiUrl: 'https://abc123xyz.lambda-url.us-east-1.on.aws/',
+   ```
+3. Reload the demo. Now:
+   - `callback.html` POSTs the ID token to create the session (no token is kept in the browser),
+   - `index.html` shows the signed-in state via `socialLogin.loadUser()` (a `GET` that reads the cookie),
+   - **Sign out** sends a `DELETE` that clears the cookie and the server record.
+
+Leave `sessionApiUrl` empty to go back to the browser-only Level-1 demo. No other code changes either way — `socialLogin.loadUser()` works in both modes.
+
+---
+
+## ⚠️ Cross-origin cookies: the one thing to understand
+
+In the demo, your pages (e.g. `http://localhost:8000`) and the session API (a `…lambda-url….on.aws` Function URL) are on **different origins**. For an httpOnly cookie to cross origins it must be `SameSite=None; Secure`, and the API's CORS must allow credentials from your **specific** origin — which is exactly what the template and `AllowedOrigin` parameter set up.
+
+Even then, **some browsers block third-party cookies** (Safari by default; Chrome is phasing them out). So treat the cross-origin Function URL as a convenient demo/dev setup. **For production, host the session API on the same site as your pages** — e.g. `api.yoursite.com` serving pages on `yoursite.com` — so the cookie is first-party and always sent. That is how real deployments avoid the third-party-cookie problem. (`SameSite=None` still works first-party; you could tighten it to `Lax` in `cookie.js` for a same-site deployment.)
+
+Note: `SameSite=None` cookies require HTTPS. `localhost` is treated as a secure context, so the demo works locally; any non-localhost site must be served over HTTPS.
 
 ---
 
@@ -92,4 +106,4 @@ A production e-commerce site this starter is modeled on uses this same architect
 node --test backend-optional/test/cookie.test.js
 ```
 
-Expected: 2 tests pass. These cover the cookie-string format (the only synchronous, pure piece of the backend). The Lambda handler itself requires a live Cognito user pool and DynamoDB table to integration-test.
+Expected: 5 tests pass. These cover the cookie helpers (build, clear, and parse — the synchronous, pure pieces of the backend). The Lambda handler itself requires a live Cognito user pool and DynamoDB table to integration-test.

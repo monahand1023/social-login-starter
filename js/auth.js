@@ -78,6 +78,13 @@
     return window.AUTH_CONFIG;
   }
 
+  // Returns the trimmed Level-2 session API base URL, or null if not configured.
+  // When null, the library runs in Level-1 (browser-only) mode.
+  function sessionApiUrl() {
+    const url = getConfig().sessionApiUrl;
+    return url && url.trim() ? url.trim().replace(/\/$/, '') : null;
+  }
+
   // Start a sign-in: build PKCE + state + nonce, stash them, redirect to Cognito.
   async function startSignIn(identityProvider) {
     const config = getConfig();
@@ -138,6 +145,26 @@
     const claims = decodeJwt(tokens.id_token);
     if (claims.nonce !== nonce) throw new Error('Nonce mismatch (possible replay attack).');
 
+    // Level 2 (sessionApiUrl set): hand the ID token to the backend, which
+    // validates it and sets an httpOnly session cookie. The browser then keeps
+    // NO tokens in JS-readable storage — the cookie is the source of truth.
+    const api = sessionApiUrl();
+    if (api) {
+      const r = await fetch(api, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ idToken: tokens.id_token }),
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(`Creating the server session failed (${r.status}): ${text}`);
+      }
+      const u = await r.json();
+      return { sub: u.sub, email: u.email, name: u.email, claims: {} };
+    }
+
+    // Level 1 (default): keep the tokens in sessionStorage (browser-only).
     sessionStorage.setItem(
       TOKENS_KEY,
       JSON.stringify({
@@ -171,8 +198,38 @@
     return { sub: c.sub, email: c.email, name: c.name || c.email, claims: c };
   }
 
-  function signOut() {
+  // Returns a Promise of the current user (or null). Works in BOTH modes:
+  //  - Level 2 (sessionApiUrl set): asks the backend, which reads the httpOnly
+  //    session cookie the browser sends automatically.
+  //  - Level 1 (default): decodes the token held in sessionStorage.
+  // Prefer this over the synchronous isLoggedIn()/getUser() so your UI works
+  // whether or not the backend is enabled.
+  async function loadUser() {
+    const api = sessionApiUrl();
+    if (api) {
+      try {
+        const r = await fetch(api, { method: 'GET', credentials: 'include' });
+        if (!r.ok) return null;
+        const u = await r.json();
+        return { sub: u.sub, email: u.email, name: u.email, claims: {} };
+      } catch (e) {
+        return null;
+      }
+    }
+    return getUser();
+  }
+
+  async function signOut() {
     const config = getConfig();
+    // Level 2: ask the backend to delete the session and clear the cookie.
+    const api = sessionApiUrl();
+    if (api) {
+      try {
+        await fetch(api, { method: 'DELETE', credentials: 'include' });
+      } catch (e) {
+        // Ignore network errors on logout — we still clear local + Cognito state.
+      }
+    }
     sessionStorage.removeItem(TOKENS_KEY);
     Object.keys(sessionStorage)
       .filter((k) => k.startsWith(PENDING_PREFIX))
@@ -187,6 +244,7 @@
       handleCallback,
       isLoggedIn,
       getUser,
+      loadUser,
       signOut,
     };
   }

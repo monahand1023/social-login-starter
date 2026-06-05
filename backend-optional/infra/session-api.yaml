@@ -10,6 +10,12 @@ Parameters:
     Type: String
   ClientId:
     Type: String
+  AllowedOrigin:
+    Type: String
+    Description: >
+      The exact origin of your website — scheme + host + port, no trailing slash
+      (e.g. http://localhost:8000 or https://yoursite.com). The browser will only
+      send/receive the credentialed session cookie for this one origin.
 
 Resources:
   SessionsTable:
@@ -44,13 +50,22 @@ Resources:
       FunctionUrlConfig:
         AuthType: NONE
         Cors:
+          # Credentialed CORS: a SPECIFIC origin is required (not '*') for the
+          # browser to send/receive the httpOnly session cookie.
           AllowOrigins:
-            - '*'
+            - !Ref AllowedOrigin
           AllowMethods:
+            - GET
             - POST
-          AllowCredentials: false
+            - DELETE
+          AllowHeaders:
+            - content-type
+          AllowCredentials: true
 
 Outputs:
   SessionApiUrl:
-    Description: POST your idToken here to receive an httpOnly session cookie
+    Description: >
+      Session API base URL (POST to create, GET to check, DELETE to log out).
+      Paste this into config.js as sessionApiUrl to switch the demo to
+      cookie-based sessions.
     Value: !GetAtt SessionFunctionUrl.FunctionUrl
