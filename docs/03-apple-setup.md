@@ -52,8 +52,6 @@ Apple requires an App ID before you can create a Services ID for web sign-in.
 5. Scroll down to **Capabilities** and check the box for **Sign in with Apple**.
 6. Click **Continue**, then **Register**.
 
-![Apple App ID registration](images/apple-app-id.png)
-
 ### 3. Create a Services ID
 
 The Services ID is what Cognito actually uses when talking to Apple. It identifies your web app specifically.
@@ -72,8 +70,6 @@ The Services ID is what Cognito actually uses when talking to Apple. It identifi
    - **Return URLs**: enter the full URL with `https://`: `https://<your-domain-prefix>.auth.<your-region>.amazoncognito.com/oauth2/idpresponse`
 8. Click **Next**, then **Done**, then **Continue**, then **Save**.
 
-![Apple Services ID configuration](images/apple-services-id.png)
-
 > **Important:** The Return URL must match exactly what Cognito sends. The `/oauth2/idpresponse` path is required — Apple will reject any other path.
 
 ### 4. Create a Sign In with Apple key
@@ -88,8 +84,6 @@ Apple uses a private key (a `.p8` file) instead of a client secret. You generate
 6. **Download the `.p8` file now.** Apple only lets you download it once. Store it somewhere safe — a local folder outside your project directory is fine, or a password manager that supports file attachments.
 
 Note the **Key ID** shown on the download page (it is also in the filename, e.g., `AuthKey_ABCDE12345.p8`). It is 10 characters.
-
-![Apple key download page](images/apple-key.png)
 
 ### 5. Find your Team ID
 

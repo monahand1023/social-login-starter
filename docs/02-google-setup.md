@@ -40,8 +40,6 @@ Go to [https://console.cloud.google.com/](https://console.cloud.google.com/). Si
 
 Create a new project or select an existing one from the project dropdown at the top of the page. A project is just a container — you can call it anything, like `My Website Login`.
 
-![Google Cloud project selector](images/google-project.png)
-
 ### 2. Configure the OAuth consent screen
 
 Every Google OAuth client needs a consent screen — the page users see that says "My App wants to access your email." You only set this up once per project.
@@ -59,8 +57,6 @@ Every Google OAuth client needs a consent screen — the page users see that say
    - `openid`
 6. Click **Update**, then **Save and Continue**.
 7. You can skip the **Test users** step for now (or add your own email as a test user if you want to test before "publishing"). Click **Save and Continue**, then **Back to Dashboard**.
-
-![Google OAuth consent screen setup](images/google-consent.png)
 
 > **Note on "app not verified":** Until you click **Publish App**, Google shows a warning to anyone who tries to sign in. For personal projects or internal tools, you can leave the app in testing mode and add specific test users — see [08-troubleshooting.md](08-troubleshooting.md) for details.
 
@@ -100,8 +96,6 @@ https://my-app-login.auth.us-east-1.amazoncognito.com/oauth2/idpresponse
 ```
 
 This is the exact URL Cognito uses to receive the sign-in response from Google. The `/oauth2/idpresponse` path is fixed — Cognito always uses it.
-
-![Google Credentials page showing redirect URI](images/google-credentials.png)
 
 ### 6. Save and copy your credentials
 

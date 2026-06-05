@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup guides
+    url: https://github.com/monahand1023/social-login-starter/tree/main/docs
+    about: Step-by-step docs — start with 01-what-you-need.md
+  - name: Troubleshooting
+    url: https://github.com/monahand1023/social-login-starter/blob/main/docs/08-troubleshooting.md
+    about: Common OAuth errors (redirect_uri_mismatch, invalid_client, …) and their fixes

@@ -2,6 +2,9 @@
 
 Add **Sign in with Google** and **Sign in with Apple** to any website — no passwords to manage, powered by AWS Cognito.
 
+[![CI](https://github.com/monahand1023/social-login-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/monahand1023/social-login-starter/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 ---
 
 ## What this is (60-second read)
@@ -87,9 +90,7 @@ If any "is NOT" item is a dealbreaker, better to know now than 40 minutes in.
 
 ## Demo
 
-![demo](docs/images/demo.png)
-
-*(Run `npm run serve` and open `http://localhost:8000` to see the live version.)*
+Run `npm run serve` and open `http://localhost:8000`, then click a sign-in button to try the live flow.
 
 ---
 

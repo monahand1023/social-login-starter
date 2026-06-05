@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Syntax-check JavaScript
+        run: |
+          node --check js/auth.js
+          node --check js/validate-config.js
+          node --check backend-optional/session-lambda/index.js
+          node --check backend-optional/session-lambda/cookie.js
+
+      - name: Syntax-check shell scripts
+        run: |
+          bash -n infra/deploy.sh
+          bash -n infra/parameters.example.sh
