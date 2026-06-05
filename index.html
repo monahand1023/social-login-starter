@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Social Login Starter — Demo</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>Social Login Starter</h1>
+    <p class="sub">A tiny demo of "Sign in with Google / Apple" via AWS Cognito.</p>
+
+    <div id="config-warning" class="warning" hidden></div>
+
+    <!-- Shown when signed OUT -->
+    <section id="logged-out" hidden>
+      <button class="btn btn-google" id="btn-google" type="button">
+        <span class="logo" aria-hidden="true">G</span> Sign in with Google
+      </button>
+      <button class="btn btn-apple" id="btn-apple" type="button">
+        <span class="logo" aria-hidden="true"></span> Sign in with Apple
+      </button>
+    </section>
+
+    <!-- Shown when signed IN -->
+    <section id="logged-in" hidden>
+      <p>You're signed in as <strong id="user-email"></strong>.</p>
+      <button class="btn btn-signout" id="btn-signout" type="button">Sign out</button>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="js/validate-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    (function () {
+      var warn = document.getElementById('config-warning');
+      var problems = window.validateSocialLoginConfig(window.AUTH_CONFIG);
+      if (problems.length) {
+        warn.hidden = false;
+        warn.innerHTML =
+          '<strong>Your config.js needs attention:</strong><ul>' +
+          problems.map(function (p) { return '<li>' + p + '</li>'; }).join('') +
+          '</ul>';
+      }
+
+      function render() {
+        var inEl = document.getElementById('logged-in');
+        var outEl = document.getElementById('logged-out');
+        if (window.socialLogin.isLoggedIn()) {
+          var user = window.socialLogin.getUser();
+          document.getElementById('user-email').textContent = user.email || user.name;
+          inEl.hidden = false;
+          outEl.hidden = true;
+        } else {
+          inEl.hidden = true;
+          outEl.hidden = false;
+        }
+      }
+
+      document.getElementById('btn-google').addEventListener('click', function () {
+        window.socialLogin.signInWithGoogle();
+      });
+      document.getElementById('btn-apple').addEventListener('click', function () {
+        window.socialLogin.signInWithApple();
+      });
+      document.getElementById('btn-signout').addEventListener('click', function () {
+        window.socialLogin.signOut();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

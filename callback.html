@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Signing you in…</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>Signing you in…</h1>
+    <p id="status">One moment.</p>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    (function () {
+      var status = document.getElementById('status');
+      window.socialLogin
+        .handleCallback()
+        .then(function () {
+          status.textContent = 'Success! Redirecting…';
+          window.location.replace('index.html');
+        })
+        .catch(function (err) {
+          status.textContent = 'Sign-in failed: ' + err.message;
+          console.error(err);
+        });
+    })();
+  </script>
+</body>
+</html>
