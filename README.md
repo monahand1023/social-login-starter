@@ -14,6 +14,77 @@ This starter wires all of that up with a **no-build, no-framework** vanilla JS f
 
 ---
 
+## How it works
+
+**The 30-second version** — your site never sees a password. Google or Apple vouches for the user, and AWS Cognito relays a signed token to your page:
+
+```mermaid
+flowchart LR
+    A["Visitor clicks<br/>Sign in with Google"] --> B["Google verifies<br/>who they are"]
+    B --> C["AWS Cognito<br/>(the middleman)"]
+    C --> D["Your site receives a<br/>signed token"]
+    D --> E["You show their<br/>name and email"]
+```
+
+**The detailed version** — under the hood it's an OAuth 2.0 Authorization Code flow with PKCE. You don't need to follow every arrow; `js/auth.js` does it all for you:
+
+```mermaid
+sequenceDiagram
+    actor U as Visitor
+    participant S as Your site
+    participant C as AWS Cognito
+    participant G as Google / Apple
+    U->>S: Click "Sign in with Google"
+    S->>S: Generate PKCE verifier + state + nonce
+    S->>C: Redirect to Cognito Hosted UI
+    C->>G: Redirect to the provider
+    U->>G: Approve sign-in
+    G->>C: Return verified identity
+    C->>S: Redirect back to callback.html?code=...
+    S->>C: Exchange code + verifier for tokens
+    C->>S: id_token + access_token
+    S->>U: Show signed-in state (name, email)
+```
+
+**Where the login lives** — by default the token stays in the browser (Level 1, no backend to run). Later, if you want server-side sessions, you flip on the optional Level 2 backend by setting a single config value:
+
+```mermaid
+flowchart TB
+    subgraph L1["Level 1 (default) — nothing to run"]
+        A1["Browser keeps the token in sessionStorage"]
+    end
+    subgraph L2["Level 2 (optional) — set sessionApiUrl"]
+        A2["Browser sends the token once"] --> B2["Lambda validates it"]
+        B2 --> C2[("DynamoDB session")]
+        B2 --> D2["httpOnly cookie (JavaScript can't read it)"]
+    end
+```
+
+Level 1 is all most sites need. Level 2 is documented in [docs/07-level-2-backend.md](docs/07-level-2-backend.md).
+
+---
+
+## What this does — and what it doesn't
+
+### ✅ What you get
+- **"Sign in with Google" and "Sign in with Apple"** on any static website — plain HTML/CSS/JS, no React, no build step.
+- A **one-command AWS deploy** (CloudFormation) for the Cognito backend, plus a click-by-click console fallback if you prefer the GUI.
+- The **secure OAuth flow done correctly** — Authorization Code + PKCE, with `state` and `nonce` checks — without you having to implement it.
+- **Beginner docs that assume nothing** — including creating your Google and Apple developer accounts from scratch.
+- An **optional Level 2 backend** for httpOnly-cookie sessions when you outgrow browser-held tokens.
+
+### 🚫 What this is NOT (so nothing surprises you)
+- **Not a full user-management system.** You learn *who is signed in* (their email, name, a stable user id). There are no profile pages, roles/permissions, an admin dashboard, or a "manage users" UI — that's yours to build on top.
+- **No password or email/magic-link login.** Sign-in is Google and Apple only. (That's the point — no passwords for you to store or leak.)
+- **No other providers wired up** (Facebook, GitHub, Microsoft, LINE…). Cognito *can* add them; this starter deliberately doesn't, to stay simple.
+- **Not a hosted service.** It runs in *your* AWS account. You own the Cognito user pool and any cost past the free tier (which is generous — see [Cost](#cost)).
+- **No MFA, no "remember me"/token refresh, no internationalization** out of the box. These are intentionally left for you to add.
+- **Not a substitute for the providers' own rules.** Apple requires a paid ($99/year) developer account; Google may show an "unverified app" screen until you publish your consent screen. The docs walk you through both — but Apple's and Google's policies are theirs, not ours.
+
+If any "is NOT" item is a dealbreaker, better to know now than 40 minutes in.
+
+---
+
 ## Demo
 
 ![demo](docs/images/demo.png)
@@ -22,19 +93,24 @@ This starter wires all of that up with a **no-build, no-framework** vanilla JS f
 
 ---
 
-## Vibe-code this
+## Vibe-code this (recommended)
 
-If you're using Claude Code, Cursor, GitHub Copilot, or any other AI coding assistant, paste the block below as your opening message. The assistant will read the docs in order and walk you through setup interactively.
+You do **not** need to understand OAuth, AWS, or CloudFormation to use this. If you're working with Claude Code, Cursor, GitHub Copilot, or any other AI coding assistant, paste the block below as your **first message** and let it drive:
 
 ```
 I want to add Google and Apple login to my website using this repo.
-Read the `docs/` folder in order (01 → 06) and walk me through it
-one step at a time, asking me for one piece of information at a time
-and waiting for my answer before moving on.
-Start with `docs/01-what-you-need.md`.
+Read the docs/ folder in order (01 → 06) and walk me through it
+ONE step at a time: ask me for one piece of information at a time,
+wait for my answer, and don't move on until each step actually works.
+I may not have a Google Cloud or Apple developer account yet —
+help me create those too. Start with docs/01-what-you-need.md.
 ```
 
-The AI will ask for your AWS region, then your Google credentials, then Apple credentials (or let you skip Apple), then deploy with you, then serve the demo — one question at a time so nothing gets missed.
+**Only want Google** (skip the $99/year Apple account)? Add one line: *"Skip Apple — Google only for now."* You can add Apple later with no code changes.
+
+**Why this works well:** the repo ships a [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md) at its root, so your assistant already has the mental model, the file map, the gotchas (where secrets go, the predictable-domain trick, the public-client rule), and a troubleshooting playbook. It follows *this* repo's flow instead of hallucinating generic OAuth advice. It will gather your AWS region, then your Google credentials, then Apple (or skip it), deploy with you, and serve the demo — one question at a time so nothing gets missed.
+
+Prefer to read and click yourself? The [Quickstart](#quickstart) below links the same docs in order.
 
 ---
 

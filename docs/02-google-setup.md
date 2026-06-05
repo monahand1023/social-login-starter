@@ -24,6 +24,16 @@ https://my-app-login.auth.us-east-1.amazoncognito.com/oauth2/idpresponse
 
 ## Steps
 
+### 0. Create your accounts (skip anything you already have)
+
+This step assumes nothing. If you already have a Google account and have used Google Cloud before, jump to Step 1.
+
+- **No Google account?** Create a free one at [accounts.google.com/signup](https://accounts.google.com/signup). Any Google account works — personal Gmail is fine.
+- **Never opened Google Cloud?** Go to [console.cloud.google.com](https://console.cloud.google.com/) and sign in with that Google account. The first time, Google asks you to **agree to the Terms of Service** — tick the box and continue. You may see prompts about a "free trial" or billing; you can ignore/dismiss them.
+- **Do I need a credit card or billing?** **No.** Creating an OAuth consent screen and an OAuth client (everything in this doc) is free and does **not** require enabling billing. Google sign-in itself costs nothing. If Cloud Console ever nudges you to "enable billing," you do not need to for this — close that prompt.
+
+That's all the account setup. Now the actual work:
+
 ### 1. Open the Google Cloud Console
 
 Go to [https://console.cloud.google.com/](https://console.cloud.google.com/). Sign in with any Google account.

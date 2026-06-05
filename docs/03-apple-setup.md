@@ -24,6 +24,19 @@ https://my-app-login.auth.us-east-1.amazoncognito.com/oauth2/idpresponse
 
 ## Steps
 
+### 0. Get an Apple ID and enroll in the Apple Developer Program
+
+This step assumes nothing. If you are already enrolled in the Apple Developer Program, jump to Step 1.
+
+1. **Apple ID** — if you don't have one, create a free Apple ID at [account.apple.com](https://account.apple.com/). Then turn on **two-factor authentication** for it (Apple *requires* 2FA to enroll as a developer): on the same page, under Sign-In and Security → Two-Factor Authentication.
+2. **Enroll in the Apple Developer Program** — go to [developer.apple.com/programs/enroll](https://developer.apple.com/programs/enroll/) and follow the steps. Key facts to know before you start:
+   - It costs **$99 per year** (a credit card or supported payment method is required).
+   - You enroll either through the **Apple Developer app** on an iPhone/iPad (fastest) or through the website.
+   - **Approval can take 24–48 hours** (sometimes longer). Apple may ask you to verify your identity. **You cannot do Steps 1–6 below until your enrollment is active** — the Identifiers/Keys sections simply won't be available.
+3. **Don't want to pay or wait?** That's fine — skip Apple entirely for now. Do [Google-only](02-google-setup.md), deploy, and come back to add Apple later. Adding Apple afterward needs **no code changes** — you just re-deploy with the Apple values filled in.
+
+Once your enrollment shows as active, continue:
+
 ### 1. Open the Apple Developer portal
 
 Go to [https://developer.apple.com/](https://developer.apple.com/) and sign in. Click **Account** at the top, then go to **Certificates, Identifiers & Profiles**.

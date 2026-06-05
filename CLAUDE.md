@@ -32,6 +32,8 @@ User clicks "Sign in with Google"
   → index.html reads the user's email/name from the id_token claims
 ```
 
+**Level 2 (optional, off by default):** if `config.sessionApiUrl` is set, `handleCallback()` instead POSTs the `id_token` to a small Lambda that sets an httpOnly cookie, and `loadUser()` / `signOut()` talk to that backend over GET / DELETE. With `sessionApiUrl` empty, everything above (Level 1) is unchanged. The async `loadUser()` works in both modes — prefer it over the sync `isLoggedIn()` / `getUser()`. See "Level 2" below.
+
 **What `config.js` holds (4 values, all public):**
 - `region` — AWS region (e.g. `us-east-1`)
 - `userPoolId` — Cognito user pool ID (e.g. `us-east-1_AbC123xyz`)
@@ -96,6 +98,54 @@ The callback URL registered with Google, Apple, and Cognito is `http://localhost
 
 ---
 
+## Assume Nothing — the User May Be Starting From Zero
+
+Many users arrive without the accounts this requires. Don't assume they exist — check, and offer to create them before going further:
+
+- **No AWS account?** Send them to https://aws.amazon.com → "Create an AWS Account" (a credit card is required, but Cognito's free tier covers this use). They also need the AWS CLI installed and `aws configure` run with an access key. The litmus test is `aws sts get-caller-identity` — if it fails, that's the real blocker; fix it before touching anything else.
+- **No Google account / never opened Google Cloud?** `docs/02` Step 0 walks through it. First-time Cloud Console use requires accepting the Terms of Service. Creating an OAuth client does **not** require enabling billing or entering a credit card — reassure them; Google sign-in is free.
+- **No Apple Developer account?** `docs/03` Step 0 walks through enrolling. Flag two things up front: it costs **$99/year**, and **approval can take 24–48 hours** — they cannot finish Apple setup until enrollment clears. If they don't want to pay or wait, do **Google-only now** and add Apple later (the code already supports it with no rework).
+
+When a user is stuck on a prerequisite, stop the main flow and resolve the prerequisite first. Don't push them forward into errors that are really "you don't have an account yet."
+
+---
+
+## Helping the User: a Playbook
+
+- **One value at a time.** Ask for the AWS region, wait. Then `DOMAIN_PREFIX`, wait. Then the Google client ID, then the secret, and so on. Never paste the whole `parameters.sh` and say "fill this in."
+- **Have them choose `DOMAIN_PREFIX` at the very start** (docs/02). The Cognito domain — and therefore the exact redirect URL that Google and Apple need — is derivable from it *before* any deploy. Lock it in early and reuse it everywhere (both consoles + `parameters.sh`).
+- **Run things for them when you can.** You can run `aws sts get-caller-identity`, `./infra/deploy.sh`, `npm test`, `npm run serve`, and `node --check`. Translate errors into plain language.
+- **After deploy, paste the 4 printed outputs into `config.js` yourself** (if you have editor access), then confirm the in-page yellow banner is gone (it's driven by `js/validate-config.js`).
+- **When something breaks, open `docs/08-troubleshooting.md` first** — it maps the exact OAuth error strings to causes and fixes.
+
+### Mini-FAQ (answer these consistently)
+- *"Where do I put my Google client secret?"* → `infra/parameters.sh` (gitignored). **Never** `config.js`.
+- *"Is it safe to commit `config.js`?"* → Yes. Its four values are public by design (the app client has no secret).
+- *"Do I have to use Apple?"* → No. Google works alone. Apple needs the paid account; you can add it later with no code changes.
+- *"It says `redirect_uri_mismatch`."* → The callback URL must match **exactly** in three places: the Google/Apple console, Cognito (`CALLBACK_URLS` in `parameters.sh`), and how the user opens the site. Locally that's `http://localhost:8000/callback.html` served via `npm run serve` — not a `file://` open.
+- *"It says `invalid_client`."* → Usually the app client was created **with** a secret, or the wrong `clientId` is in `config.js`. The client must be public (no secret).
+- *"Nothing happens / a CORS error on the token call."* → They opened the page as a `file://` URL. Serve over `http://localhost:8000`.
+- *"Google says the app isn't verified."* → Expected until they click **Publish app** on the consent screen; for personal use they can stay in testing mode and add themselves as a test user.
+- *"I don't want to wait for Apple."* → Go Google-only now; revisit Apple after enrollment clears.
+
+---
+
+## Level 2 (optional): Enabling Server-Side Sessions
+
+The frontend is already wired for the optional httpOnly-cookie backend; it stays off until `config.sessionApiUrl` is set.
+
+- **To enable:** deploy `backend-optional/` (AWS SAM) with `AllowedOrigin=<the exact origin the site is served from>` (e.g. `http://localhost:8000`), then paste the printed `SessionApiUrl` into `config.js` as `sessionApiUrl`. Leave it empty to stay on Level 1.
+- **What changes:** `handleCallback()` POSTs the ID token to create the session and keeps **no** token in the browser; `loadUser()` reads the session via GET; `signOut()` sends DELETE. `loadUser()` is async and works in both modes.
+- **Cross-origin cookie caveat (don't oversell it):** the demo's session API (a Lambda Function URL) is a *different origin* from the site, so the cookie is third-party (`SameSite=None; Secure` + credentialed CORS). Some browsers block third-party cookies. For production, host the session API **same-site** as the pages (e.g. `api.example.com` ↔ `example.com`) so the cookie is first-party. Full detail in `docs/07`. Don't promise the cross-origin demo cookie will work in every browser.
+
+---
+
+## Tone
+
+Assume zero prior OAuth, AWS, or cloud experience. Explain *why* a step matters in one sentence, not just *what* to click. The first token coming back is the milestone — call it out when it happens. Console UIs change often (Google and Apple rename buttons); describe the goal, not just the exact label, and adapt if what they see doesn't match the doc.
+
+---
+
 ## How to Verify Changes
 
 **Run the test suite:**
@@ -133,7 +183,7 @@ The following are intentionally not implemented. Do not add them without a clear
 - **Custom domains** — the repo uses the free `*.amazoncognito.com` Hosted UI domain. Custom domains require ACM certificates and additional CloudFormation resources.
 - **Bilingual / internationalization** — the demo is English only.
 - **MFA / TOTP** — Cognito supports MFA, but this starter does not configure or document it.
-- **Refresh token rotation** — tokens are stored in sessionStorage and expire when the browser session ends. Persistent login and token refresh are left to the user to implement on top of this foundation.
+- **Refresh token rotation / "remember me"** — Level 1 tokens live in sessionStorage and expire with the browser session; the optional Level 2 backend issues a 7-day session cookie but does not refresh it. Long-lived or auto-refreshing sessions are left for the user to build on top. (Note: httpOnly-cookie sessions themselves *are* implemented — see the optional `backend-optional/` Level 2.)
 
 ---
 
