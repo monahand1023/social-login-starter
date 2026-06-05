@@ -1,0 +1,11 @@
+{
+  "name": "social-login-starter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Add Google and Apple sign-in to any static website with AWS Cognito.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test",
+    "serve": "python3 -m http.server 8000"
+  }
+}

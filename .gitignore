@@ -1,0 +1,15 @@
+# Your filled-in frontend config (copy of config.example.js)
+config.js
+
+# Your real deploy parameters and Apple key — NEVER commit these
+infra/parameters.sh
+*.p8
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
